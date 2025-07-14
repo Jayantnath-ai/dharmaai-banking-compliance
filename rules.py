@@ -1,5 +1,3 @@
-### rules.py
-```python
 from datetime import datetime, timezone, timedelta
 
 # AML parameters
