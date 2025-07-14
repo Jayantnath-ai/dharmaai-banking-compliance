@@ -136,7 +136,8 @@ if st.button("Run Compliance Checks"):
         st.table(filtered)
 
         buf = io.StringIO()
-        writer = csv.DictWriter(buf, fieldnames=["rule","regulation","description","entity","detail","timestamp"])
+        writer = csv.DictWriter(buf,fieldnames=["rule","regulation","description","entity","detail","timestamp","date"])
+
         writer.writeheader()
         writer.writerows(filtered)
 
