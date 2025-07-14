@@ -13,15 +13,20 @@ fake = Faker()
 
 # --- Sidebar: Filters & Parameters ---
 st.sidebar.header("Filter Controls")
-date_filter = st.sidebar.date_input(
-    "From Date",
-    value=date(1970, 1, 1)     # <<< very early date
-)
 all_rules = list(RULE_META.keys())
 selected_rules = st.sidebar.multiselect("Rules", options=all_rules, default=all_rules)
 all_regs = sorted({meta[0] for meta in RULE_META.values()})
 selected_regs = st.sidebar.multiselect("Regulations", options=all_regs, default=all_regs)
-date_filter = st.sidebar.date_input("From Date", value=datetime.now().date())
+use_date = st.sidebar.checkbox("Filter by date", value=False)
+if use_date:
+    date_filter = st.sidebar.date_input("From Date", value=date(1970, 1, 1))
+else:
+    date_filter = None
+if date_filter:
+    filtered = [r for r in records if r["date"] and r["date"] >= date_filter]
+else:
+    filtered = records
+
 
 st.sidebar.header("Threshold Parameters")
 ctr_threshold        = st.sidebar.number_input("CTR threshold ($)",       min_value=1, value=10000)
