@@ -2,6 +2,7 @@ import streamlit as st
 from faker import Faker
 import uuid
 from random import gauss, choice
+from datetime import date
 from datetime import datetime
 from collections import Counter
 import csv, io
@@ -12,6 +13,10 @@ fake = Faker()
 
 # --- Sidebar: Filters & Parameters ---
 st.sidebar.header("Filter Controls")
+date_filter = st.sidebar.date_input(
+    "From Date",
+    value=date(1970, 1, 1)     # <<< very early date
+)
 all_rules = list(RULE_META.keys())
 selected_rules = st.sidebar.multiselect("Rules", options=all_rules, default=all_rules)
 all_regs = sorted({meta[0] for meta in RULE_META.values()})
