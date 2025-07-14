@@ -20,7 +20,15 @@ all_regs = sorted({meta[0] for meta in RULE_META.values()})
 selected_regs = st.sidebar.multiselect("Regulations", options=all_regs, default=all_regs)
 
 # Date filter (default very early so nothing is filtered out unintentionally)
-date_filter = st.sidebar.date_input("From Date", value=date(1970, 1, 1))
+from datetime import date
+
+date_filter = st.sidebar.date_input(
+    "From Date",
+    value=date(1970, 1, 1),
+    min_value=date(1970, 1, 1),
+    max_value=date.today()        # <-- now you can pick through to 2025
+)
+
 
 st.sidebar.header("Threshold Parameters")
 ctr_threshold        = st.sidebar.number_input("CTR threshold ($)",       min_value=1,     value=10000)
