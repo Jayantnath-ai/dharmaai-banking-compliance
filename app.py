@@ -2,8 +2,7 @@ import streamlit as st
 from faker import Faker
 import uuid
 from random import gauss, choice
-from datetime import date
-from datetime import datetime
+from datetime import datetime, date
 from collections import Counter
 import csv, io
 
@@ -13,26 +12,21 @@ fake = Faker()
 
 # --- Sidebar: Filters & Parameters ---
 st.sidebar.header("Filter Controls")
+
+# Rule & regulation selectors
 all_rules = list(RULE_META.keys())
 selected_rules = st.sidebar.multiselect("Rules", options=all_rules, default=all_rules)
 all_regs = sorted({meta[0] for meta in RULE_META.values()})
 selected_regs = st.sidebar.multiselect("Regulations", options=all_regs, default=all_regs)
-use_date = st.sidebar.checkbox("Filter by date", value=False)
-if use_date:
-    date_filter = st.sidebar.date_input("From Date", value=date(1970, 1, 1))
-else:
-    date_filter = None
-if date_filter:
-    filtered = [r for r in records if r["date"] and r["date"] >= date_filter]
-else:
-    filtered = records
 
+# Date filter (default very early so nothing is filtered out unintentionally)
+date_filter = st.sidebar.date_input("From Date", value=date(1970, 1, 1))
 
 st.sidebar.header("Threshold Parameters")
-ctr_threshold        = st.sidebar.number_input("CTR threshold ($)",       min_value=1, value=10000)
-exposure_threshold   = st.sidebar.number_input("Exposure threshold ($)",  min_value=1, value=100000)
-sar_threshold        = st.sidebar.number_input("SAR txn count threshold", min_value=1, value=5)
-min_retention_years  = st.sidebar.number_input("Min retention (yrs)",     min_value=1, value=5)
+ctr_threshold        = st.sidebar.number_input("CTR threshold ($)",       min_value=1,     value=10000)
+exposure_threshold   = st.sidebar.number_input("Exposure threshold ($)",  min_value=1,     value=100000)
+sar_threshold        = st.sidebar.number_input("SAR txn count threshold", min_value=1,     value=5)
+min_retention_years  = st.sidebar.number_input("Min retention (yrs)",     min_value=1,     value=5)
 
 # --- Mock Data Generators ---
 def gen_customer():
@@ -68,10 +62,13 @@ def gen_transaction():
     }
 
 # --- App UI ---
-st.title("🏦 DharmaAI Banking Compliance Demo (AML, BCBS, GDPR, SOX)")
+st.title("🏦 DharmaAI Compliance Demo (Extended)")
 
 if st.button("Run Compliance Checks"):
+    # Generate mock transactions
     txs = [gen_transaction() for _ in range(200)]
+
+    # Run all compliance rules
     raw_alerts = run_compliance_batch(
         txs,
         ctr_threshold=ctr_threshold,
@@ -86,26 +83,37 @@ if st.button("Run Compliance Checks"):
     for rule, entity, detail in raw_alerts:
         reg_label, reg_desc = RULE_META.get(rule, ("Unknown",""))
         ts = tx_map.get(entity, {}).get("timestamp", "")
-        rec_date = datetime.fromisoformat(ts).date() if ts else None
+        # parse date for filtering
+        rec_date = None
+        if ts:
+            try:
+                rec_date = datetime.fromisoformat(ts).date()
+            except Exception:
+                rec_date = None
         records.append({
-            "rule":       rule,
-            "regulation": reg_label,
-            "description":reg_desc,
-            "entity":     entity,
-            "detail":     detail,
-            "timestamp":  ts,
-            "date":       rec_date
+            "rule":        rule,
+            "regulation":  reg_label,
+            "description": reg_desc,
+            "entity":      entity,
+            "detail":      detail,
+            "timestamp":   ts,
+            "date":        rec_date
         })
 
-    # Apply filters
+    # ←– Apply date filter here
+    if date_filter:
+        filtered = [r for r in records if r["date"] and r["date"] >= date_filter]
+    else:
+        filtered = records
+
+    # Then apply rule & regulation filters
     filtered = [
-        r for r in records
+        r for r in filtered
         if r["rule"] in selected_rules
         and r["regulation"] in selected_regs
-        and (r["date"] and r["date"] >= date_filter)
     ]
 
-    # Metrics
+    # --- Metrics ---
     st.subheader("🔍 Summary")
     st.write(f"- Processed **{len(txs)}** transactions")
     st.write(f"- Alerts (filtered): **{len(filtered)}**")
@@ -114,14 +122,21 @@ if st.button("Run Compliance Checks"):
     for rule, cnt in counts.items():
         st.write(f"- {rule}: {cnt}")
 
-    # Display & download
+    # --- Display & Download ---
     if filtered:
         st.subheader("⚠️ Alert Audit Trail")
         st.table(filtered)
+
         buf = io.StringIO()
         writer = csv.DictWriter(buf, fieldnames=["rule","regulation","description","entity","detail","timestamp"])
         writer.writeheader()
         writer.writerows(filtered)
-        st.download_button("Download Alerts as CSV", buf.getvalue(), "compliance_alerts.csv", "text/csv")
+
+        st.download_button(
+            label="Download Alerts as CSV",
+            data=buf.getvalue(),
+            file_name="compliance_alerts.csv",
+            mime="text/csv"
+        )
     else:
         st.success("✅ No alerts match the filters")
