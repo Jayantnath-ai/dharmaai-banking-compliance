@@ -91,10 +91,7 @@ def run_compliance_batch(txs):
         alerts.extend(evaluate_aml_rules(tx))
     alerts.extend(evaluate_bcbs239_batch(txs))
     return alerts
-```  
 
-### app.py
-```python
 import streamlit as st
 from faker import Faker
 import uuid
