@@ -5,6 +5,17 @@ from datetime import datetime, timezone, timedelta
 HIGH_RISK_COUNTRIES = {"NG", "IR", "KP", "SY", "VE"}
 EXPOSURE_THRESHOLD = 100_000  # for BCBS 239 aggregated exposure
 
+# Regulation metadata
+RULE_META = {
+    "LargeTxn":             ("AML Section 1", "CTR threshold > $10 000"),
+    "HighRiskCountry":      ("AML Section 2", "High-risk jurisdiction screening"),
+    "HighRiskCustomer":     ("AML Section 3", "Enhanced due diligence for high-risk customers"),
+    "MissingField":         ("BCBS 239 Principle 4", "Completeness: no missing fields"),
+    "NegativeAmount":       ("BCBS 239 Principle 3", "Accuracy & integrity: no invalid/negative amounts"),
+    "StaleData":            ("BCBS 239 Principle 5", "Timeliness: data ≤ 24 h old"),
+    "HighCustomerExposure": ("BCBS 239 Principle 2", "Data architecture: consolidate exposures")
+}
+
 def evaluate_aml_rules(tx):
     alerts = []
     if tx.get("amount", 0) > 10_000:
@@ -24,23 +35,19 @@ def evaluate_bcbs239_batch(txs):
     # Per-transaction checks
     required = ["tx_id", "timestamp", "amount", "currency", "customer_id"]
     for tx in txs:
-        # 1. MissingField
         for field in required:
             if not tx.get(field):
                 alerts.append(("MissingField", tx.get("tx_id", "<unknown>"), field))
-        # 2. NegativeAmount
         if tx.get("amount", 0) <= 0:
             alerts.append(("NegativeAmount", tx["tx_id"], tx.get("amount")))
-        # 3. StaleData
         try:
             ts = datetime.fromisoformat(tx["timestamp"])
             if now - ts > timedelta(hours=24):
                 alerts.append(("StaleData", tx["tx_id"], tx["timestamp"]))
         except Exception:
-            # malformed timestamp
             alerts.append(("StaleData", tx.get("tx_id", "<unknown>"), tx.get("timestamp")))
 
-    # 4. HighCustomerExposure (aggregate)
+    # Aggregate-level check
     exposures = {}
     for tx in txs:
         cid = tx.get("customer_id")
@@ -54,11 +61,10 @@ def evaluate_bcbs239_batch(txs):
 def run_compliance_batch(txs):
     """
     Combined AML + BCBS 239 compliance checks.
+    Returns list of tuples: (rule_name, entity, detail).
     """
     alerts = []
-    # AML alerts
     for tx in txs:
         alerts.extend(evaluate_aml_rules(tx))
-    # BCBS 239 alerts
     alerts.extend(evaluate_bcbs239_batch(txs))
     return alerts
