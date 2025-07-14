@@ -58,7 +58,7 @@ def gen_transaction():
     }
 
 # --- App UI ---
-st.title("🏦 DharmaAI Banking Compliance Demo (Extended)")
+st.title("🏦 DharmaAI Banking Compliance Demo (AML, BCBS, GDPR, SOX)")
 
 if st.button("Run Compliance Checks"):
     txs = [gen_transaction() for _ in range(200)]
