@@ -5,24 +5,18 @@ from random import gauss, choice
 from collections import Counter
 import csv, io
 
-from rules import run_aml_batch
+from rules import run_compliance_batch  # updated import
 
 fake = Faker()
 
-# --- Mock Customer Profiles ---
+# Mock customer setup (unchanged)
 def gen_customer():
-    return {
-        "customer_id": str(uuid.uuid4()),
-        "risk_rating": choice(["Low", "Medium", "High"])
-    }
-
-# Build an in-memory list of profiles
+    return {"customer_id": str(uuid.uuid4()), "risk_rating": choice(["Low","Medium","High"])}
 CUSTOMERS = [gen_customer() for _ in range(200)]
 CUST_MAP = {c["customer_id"]: c["risk_rating"] for c in CUSTOMERS}
 
-# --- Transaction Generator ---
+# Transaction generator (unchanged)
 def gen_transaction():
-    # pick a random customer and embed its rating
     cid = choice(list(CUST_MAP.keys()))
     return {
         "tx_id": str(uuid.uuid4()),
@@ -38,54 +32,39 @@ def gen_transaction():
         "risk_rating": CUST_MAP[cid]
     }
 
-# --- Streamlit UI ---
-st.title("🏦 DharmaAI AML Compliance Demo")
+# UI
+st.title("🏦 DharmaAI Compliance Demo (AML + BCBS 239)")
 
-if st.button("Run 200 Mock TX through Rules"):
+if st.button("Run 200 Mock TX & BCBS 239 Checks"):
     txs = [gen_transaction() for _ in range(200)]
-    alerts = run_aml_batch(txs)
+    alerts = run_compliance_batch(txs)
 
-    # Build audit-trail records
+    # Build audit trail
     tx_map = {tx["tx_id"]: tx for tx in txs}
-    records = []
-    for rule, tx_id, detail in alerts:
-        tx = tx_map[tx_id]
-        records.append({
-            "rule": rule,
-            "tx_id": tx_id,
-            "detail": detail,
-            "timestamp": tx["timestamp"]
-        })
+    records = [
+        {"rule": rule, "entity": entity, "detail": detail,
+         "timestamp": tx_map.get(entity, txs[0])["timestamp"]
+         if rule not in ("HighCustomerExposure",) else ""}
+        for rule, entity, detail in alerts
+    ]
 
     # Metrics
-    total_tx = len(txs)
-    total_alerts = len(records)
-    counts = Counter(r["rule"] for r in records)
-
     st.subheader("🔍 Summary")
-    st.write(f"- Processed **{total_tx}** transactions")
-    st.write(f"- Generated **{total_alerts}** alerts")
+    st.write(f"- Processed **{len(txs)}** transactions")
+    st.write(f"- Generated **{len(records)}** alerts")
+    counts = Counter(r["rule"] for r in records)
     st.write("**Alerts by rule:**")
     for rule, cnt in counts.items():
         st.write(f"- {rule}: {cnt}")
 
-    # Alert table
+    # Alert table + download
     if records:
         st.subheader("⚠️ Alert Audit Trail")
         st.table(records)
-
-        # CSV download
         buf = io.StringIO()
-        writer = csv.DictWriter(buf, fieldnames=["rule","tx_id","detail","timestamp"])
+        writer = csv.DictWriter(buf, fieldnames=records[0].keys())
         writer.writeheader()
         writer.writerows(records)
-        csv_data = buf.getvalue()
-
-        st.download_button(
-            label="Download Alerts as CSV",
-            data=csv_data,
-            file_name="aml_alerts.csv",
-            mime="text/csv"
-        )
+        st.download_button("Download Alerts as CSV", buf.getvalue(), "compliance_alerts.csv", "text/csv")
     else:
-        st.success("✅ No alerts—all transactions passed")
+        st.success("✅ No alerts—all checks passed")
