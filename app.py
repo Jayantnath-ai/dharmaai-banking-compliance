@@ -4,37 +4,34 @@ import uuid
 from random import gauss, choice
 from datetime import datetime, date
 from collections import Counter
+import pandas as pd
 import csv, io
 
 from rules import run_compliance_batch, RULE_META
 
 fake = Faker()
 
-# --- Sidebar: Filters & Parameters ---
-st.sidebar.header("Filter Controls")
+# --- Sidebar: Data Source & Filters ---
+st.sidebar.header("Data Source")
+uploaded_file = st.sidebar.file_uploader(
+    "Upload transactions file",
+    type=['csv', 'json', 'xlsx'],
+    help="Accepts CSV, JSON, or Excel files. If none uploaded, mock data will be used."
+)
 
-# Rule & regulation selectors
+st.sidebar.header("Filter Controls")
 all_rules = list(RULE_META.keys())
 selected_rules = st.sidebar.multiselect("Rules", options=all_rules, default=all_rules)
 all_regs = sorted({meta[0] for meta in RULE_META.values()})
 selected_regs = st.sidebar.multiselect("Regulations", options=all_regs, default=all_regs)
 
-# Date filter (default very early so nothing is filtered out unintentionally)
-from datetime import date
-
-date_filter = st.sidebar.date_input(
-    "From Date",
-    value=date(1970, 1, 1),
-    min_value=date(1970, 1, 1),
-    max_value=date.today()        # <-- now you can pick through to 2025
-)
-
+date_filter = st.sidebar.date_input("From Date", value=date(1970, 1, 1))
 
 st.sidebar.header("Threshold Parameters")
-ctr_threshold        = st.sidebar.number_input("CTR threshold ($)",       min_value=1,     value=10000)
-exposure_threshold   = st.sidebar.number_input("Exposure threshold ($)",  min_value=1,     value=100000)
-sar_threshold        = st.sidebar.number_input("SAR txn count threshold", min_value=1,     value=5)
-min_retention_years  = st.sidebar.number_input("Min retention (yrs)",     min_value=1,     value=5)
+ctr_threshold        = st.sidebar.number_input("CTR threshold ($)",       min_value=1,    value=10000)
+exposure_threshold   = st.sidebar.number_input("Exposure threshold ($)",  min_value=1,    value=100000)
+sar_threshold        = st.sidebar.number_input("SAR txn count threshold", min_value=1,    value=5)
+min_retention_years  = st.sidebar.number_input("Min retention (yrs)",     min_value=1,    value=5)
 
 # --- Mock Data Generators ---
 def gen_customer():
@@ -63,20 +60,33 @@ def gen_transaction():
         "customer_id":     cid,
         "risk_rating":     cust["risk_rating"],
         "kyc_completed":   cust["kyc_completed"],
-        # Fields for GDPR & SOX
-        "retention_period": choice([1,3,5,7,10]),  # years
+        # GDPR & SOX fields
+        "retention_period": choice([1, 3, 5, 7, 10]),
         "initiator_id":     fake.bothify("EMP-####"),
         "approver_id":      fake.bothify("EMP-####")
     }
 
 # --- App UI ---
-st.title("🏦 DharmaAI Compliance Demo (Extended)")
+st.title("🏦 DharmaAI Compliance Demo (Data Format Agnostic)")
 
 if st.button("Run Compliance Checks"):
-    # Generate mock transactions
-    txs = [gen_transaction() for _ in range(200)]
+    # Load data from upload or generate mock
+    if uploaded_file:
+        try:
+            if uploaded_file.name.endswith('.csv'):
+                df = pd.read_csv(uploaded_file)
+            elif uploaded_file.name.endswith('.json'):
+                df = pd.read_json(uploaded_file)
+            else:
+                df = pd.read_excel(uploaded_file)
+            txs = df.to_dict(orient='records')
+        except Exception as e:
+            st.error(f"Error reading file: {e}")
+            st.stop()
+    else:
+        txs = [gen_transaction() for _ in range(200)]
 
-    # Run all compliance rules
+    # Run compliance rules
     raw_alerts = run_compliance_batch(
         txs,
         ctr_threshold=ctr_threshold,
@@ -85,13 +95,13 @@ if st.button("Run Compliance Checks"):
         min_retention_years=min_retention_years
     )
 
-    # Build full audit-trail records
-    tx_map = {tx["tx_id"]: tx for tx in txs}
+    # Build audit-trail records
+    tx_map = {tx.get("tx_id", idx): tx for idx, tx in enumerate(txs)}
     records = []
     for rule, entity, detail in raw_alerts:
-        reg_label, reg_desc = RULE_META.get(rule, ("Unknown",""))
-        ts = tx_map.get(entity, {}).get("timestamp", "")
-        # parse date for filtering
+        reg_label, reg_desc = RULE_META.get(rule, ("Unknown", ""))
+        tx = tx_map.get(entity, {})
+        ts = tx.get("timestamp", "")
         rec_date = None
         if ts:
             try:
@@ -108,36 +118,33 @@ if st.button("Run Compliance Checks"):
             "date":        rec_date
         })
 
-    # ←– Apply date filter here
-    if date_filter:
-        filtered = [r for r in records if r["date"] and r["date"] >= date_filter]
-    else:
-        filtered = records
-
-    # Then apply rule & regulation filters
+    # Apply filters
     filtered = [
-        r for r in filtered
+        r for r in records
         if r["rule"] in selected_rules
         and r["regulation"] in selected_regs
+        and r["date"] and r["date"] >= date_filter
     ]
 
-    # --- Metrics ---
+    # Metrics
     st.subheader("🔍 Summary")
-    st.write(f"- Processed **{len(txs)}** transactions")
+    st.write(f"- Records processed: **{len(txs)}**")
     st.write(f"- Alerts (filtered): **{len(filtered)}**")
     counts = Counter(r["rule"] for r in filtered)
     st.write("**Alerts by rule:**")
     for rule, cnt in counts.items():
         st.write(f"- {rule}: {cnt}")
 
-    # --- Display & Download ---
+    # Display & download
     if filtered:
         st.subheader("⚠️ Alert Audit Trail")
         st.table(filtered)
 
         buf = io.StringIO()
-        writer = csv.DictWriter(buf,fieldnames=["rule","regulation","description","entity","detail","timestamp","date"])
-
+        writer = csv.DictWriter(
+            buf,
+            fieldnames=["rule","regulation","description","entity","detail","timestamp","date"]
+        )
         writer.writeheader()
         writer.writerows(filtered)
 
