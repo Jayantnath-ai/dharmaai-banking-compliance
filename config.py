@@ -3,15 +3,15 @@
 from datetime import date
 
 # Threshold defaults
-CTR_THRESHOLD_DEFAULT = 10_000
-EXPOSURE_THRESHOLD_DEFAULT = 100_000
-SAR_TXN_COUNT_THRESHOLD_DEFAULT = 5
-MIN_RETENTION_YEARS_DEFAULT = 5
+CTR_THRESHOLD_DEFAULT             = 10_000
+EXPOSURE_THRESHOLD_DEFAULT        = 100_000
+SAR_TXN_COUNT_THRESHOLD_DEFAULT   = 5
+MIN_RETENTION_YEARS_DEFAULT       = 5
 
 # Supported file extensions
-STRUCTURED_EXT = {'csv', 'json', 'xlsx'}
-UNSTRUCTURED_EXT = {'txt'}
-ALL_EXTENSIONS = STRUCTURED_EXT.union(UNSTRUCTURED_EXT)
+STRUCTURED_EXT     = {'csv', 'json', 'xlsx'}
+UNSTRUCTURED_EXT   = {'txt'}
+ALL_EXTENSIONS     = STRUCTURED_EXT.union(UNSTRUCTURED_EXT)
 
 # Default “From Date” filter
 DATE_FILTER_DEFAULT = date(1970, 1, 1)
@@ -23,10 +23,9 @@ UNSTRUCTURED_PATTERN = (
     r"Amount[:=]\s*\$?(?P<amount>[\d,\.]+)"
 )
 
-# Dynamic PEP & OFAC list sources
-PEP_LIST_SOURCE = "https://example.com/path/to/pep_list.csv"
-OFAC_LIST_SOURCE = "https://home.treasury.gov/ofac/downloads/sdn.csv"
+# Dynamic PEP & OFAC list sources (authoritative CSV endpoints)
+PEP_LIST_SOURCE  = "https://api.opensanctions.org/entities.csv?schema=Person&tag=peps"
+OFAC_LIST_SOURCE = "https://www.treasury.gov/ofac/downloads/sdn.csv"
 
-# Cache TTL for remote list downloads (seconds)
-LIST_CACHE_TTL = 86400
-
+# Cache TTL for remote list downloads (seconds) – 24 hours
+LIST_CACHE_TTL    = 86400
