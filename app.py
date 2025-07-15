@@ -67,7 +67,7 @@ def gen_transaction():
     }
 
 # --- App UI ---
-st.title("🏦 DharmaAI Compliance Demo (Data Format Agnostic)")
+st.title("🏦 DharmaAI Banking Compliance Demo (AML, BCBS, GDPR, SOX)")
 
 if st.button("Run Compliance Checks"):
     # Load data from upload or generate mock
