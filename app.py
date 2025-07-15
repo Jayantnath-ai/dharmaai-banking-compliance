@@ -7,6 +7,10 @@ from random import gauss, choice
 from datetime import datetime, date
 from collections import Counter
 import csv, io
+import re
+import textract
+from PIL import Image
+import pytesseract
 
 from rules import run_compliance_batch, RULE_META
 
@@ -17,19 +21,58 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-st.markdown("## 🏦 DharmaAI Banking Compliance Demo", unsafe_allow_html=True)
+st.markdown("## 🏦 DharmaAI Compliance Demo", unsafe_allow_html=True)
 st.write("---")
 
 fake = Faker()
 
-# --- Sidebar: Structured Settings ---
+# --- Unstructured Data Parser ---
+def parse_unstructured(uploaded_file):
+    """Extract transaction records from arbitrary text/PDF/image uploads."""
+    # 1) Extract raw text
+    name = uploaded_file.name.lower()
+    if name.endswith(('.png', '.jpg', '.jpeg')):
+        img = Image.open(uploaded_file)
+        text = pytesseract.image_to_string(img)
+    else:
+        raw = textract.process(uploaded_file)
+        text = raw.decode('utf-8', errors='ignore')
+
+    # 2) Regex to pull out TXID, timestamp, amount
+    pattern = re.compile(
+        r"TXID[:=]\s*(?P<tx_id>\w+).*?"
+        r"(Date|Timestamp)[:=]\s*(?P<timestamp>[\d\-T\:]+).*?"
+        r"Amount[:=]\s*\$?(?P<amount>[\d,\.]+)",
+        re.IGNORECASE | re.DOTALL
+    )
+    txs = []
+    for m in pattern.finditer(text):
+        try:
+            amt = float(m.group('amount').replace(',', ''))
+        except:
+            amt = 0.0
+        txs.append({
+            "tx_id":     m.group('tx_id'),
+            "timestamp": m.group('timestamp'),
+            "amount":    amt,
+            # supply defaults for missing structured fields:
+            "currency":        "USD",
+            "customer_id":     None,
+            "risk_rating":     "Unknown",
+            "kyc_completed":   False,
+            "sender_country":  None,
+            "receiver_country": None,
+        })
+    return txs
+
+# --- Sidebar: Data Source & Settings ---
 st.sidebar.title("⚙️ Settings")
 
 st.sidebar.markdown("### Data Source")
 uploaded_file = st.sidebar.file_uploader(
     "Upload transactions file",
-    type=['csv', 'json', 'xlsx'],
-    help="Accepts CSV, JSON, or Excel files. If none uploaded, mock data will be used."
+    type=['csv','json','xlsx','txt','pdf','docx','png','jpg'],
+    help="Structured or free-form; we’ll auto-parse."
 )
 
 st.sidebar.markdown("---")
@@ -50,13 +93,13 @@ min_retention_years = st.sidebar.number_input("Min retention (yrs)",      min_va
 # --- Mock Data Generators ---
 def gen_customer():
     return {
-        "customer_id":  str(uuid.uuid4()),
-        "risk_rating":  choice(["Low", "Medium", "High"]),
+        "customer_id":   str(uuid.uuid4()),
+        "risk_rating":   choice(["Low", "Medium", "High"]),
         "kyc_completed": choice([True, False])
     }
 
 CUSTOMERS = [gen_customer() for _ in range(200)]
-CUST_MAP    = {c["customer_id"]: c for c in CUSTOMERS}
+CUST_MAP   = {c["customer_id"]: c for c in CUSTOMERS}
 
 def gen_transaction():
     cid  = choice(list(CUST_MAP.keys()))
@@ -82,23 +125,30 @@ def gen_transaction():
 
 # --- Main App Logic ---
 if st.button("Run Compliance Checks"):
-    # Load or mock data
+    # 1) Load transactions
     if uploaded_file:
-        try:
-            if uploaded_file.name.endswith('.csv'):
-                df = pd.read_csv(uploaded_file)
-            elif uploaded_file.name.endswith('.json'):
-                df = pd.read_json(uploaded_file)
-            else:
-                df = pd.read_excel(uploaded_file)
-            txs = df.to_dict(orient='records')
-        except Exception as e:
-            st.error(f"Error reading file: {e}")
-            st.stop()
+        ext = uploaded_file.name.lower().split('.')[-1]
+        if ext in ['csv', 'json', 'xlsx']:
+            try:
+                if ext == 'csv':
+                    df = pd.read_csv(uploaded_file)
+                elif ext == 'json':
+                    df = pd.read_json(uploaded_file)
+                else:
+                    df = pd.read_excel(uploaded_file)
+                txs = df.to_dict(orient='records')
+            except Exception as e:
+                st.error(f"Error reading structured file: {e}")
+                st.stop()
+        else:
+            txs = parse_unstructured(uploaded_file)
+            if not txs:
+                st.error("No transactions parsed from unstructured file.")
+                st.stop()
     else:
         txs = [gen_transaction() for _ in range(200)]
 
-    # Run all compliance rules
+    # 2) Run compliance engine
     raw_alerts = run_compliance_batch(
         txs,
         ctr_threshold=ctr_threshold,
@@ -107,7 +157,7 @@ if st.button("Run Compliance Checks"):
         min_retention_years=min_retention_years
     )
 
-    # Build audit-trail records
+    # 3) Build audit-trail
     tx_map = {tx.get("tx_id", idx): tx for idx, tx in enumerate(txs)}
     records = []
     for rule, entity, detail in raw_alerts:
@@ -118,7 +168,7 @@ if st.button("Run Compliance Checks"):
         if ts:
             try:
                 rec_date = datetime.fromisoformat(ts).date()
-            except Exception:
+            except:
                 rec_date = None
         records.append({
             "rule":        rule,
@@ -130,7 +180,7 @@ if st.button("Run Compliance Checks"):
             "date":        rec_date
         })
 
-    # Apply filters
+    # 4) Filter
     filtered = [
         r for r in records
         if r["rule"] in selected_rules
@@ -138,7 +188,7 @@ if st.button("Run Compliance Checks"):
         and r["date"] and r["date"] >= date_filter
     ]
 
-    # --- Metrics Display ---
+    # 5) Metrics
     tx_count    = len(txs)
     alert_count = len(filtered)
     unique_rules= len({r["rule"] for r in filtered})
@@ -148,18 +198,18 @@ if st.button("Run Compliance Checks"):
     col2.metric("Alerts", alert_count)
     col3.metric("Unique Rules", unique_rules)
 
-    # Bar chart of rule counts
+    # 6) Bar chart
     counts = Counter(r["rule"] for r in filtered)
     count_df = pd.DataFrame.from_dict(counts, orient='index', columns=['count']).reset_index()
     count_df.columns = ['rule', 'count']
     bar = alt.Chart(count_df).mark_bar().encode(
         x=alt.X('rule', sort='-y'),
         y='count',
-        tooltip=['rule', 'count']
+        tooltip=['rule','count']
     ).properties(width='container', height=300)
     st.altair_chart(bar, use_container_width=True)
 
-    # Expander for active settings
+    # 7) Active settings expander
     with st.expander("🔧 Active Filters & Parameters", expanded=False):
         st.write("**Rules:**", selected_rules)
         st.write("**Regulations:**", selected_regs)
@@ -169,18 +219,16 @@ if st.button("Run Compliance Checks"):
         st.write("**SAR txn threshold:**", sar_threshold)
         st.write("**Min retention (yrs):**", min_retention_years)
 
-    # Interactive alert table & download
+    # 8) Table & download
     st.subheader("⚠️ Alert Audit Trail")
     st.dataframe(filtered, height=400)
 
     buf = io.StringIO()
-    writer = csv.DictWriter(
-        buf,
-        fieldnames=["rule", "regulation", "description", "entity", "detail", "timestamp", "date"]
-    )
+    writer = csv.DictWriter(buf, fieldnames=[
+        "rule","regulation","description","entity","detail","timestamp","date"
+    ])
     writer.writeheader()
     writer.writerows(filtered)
-
     st.download_button(
         label="Download Alerts as CSV",
         data=buf.getvalue(),
