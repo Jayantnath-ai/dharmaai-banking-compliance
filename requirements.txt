@@ -1,3 +1,5 @@
 streamlit
 faker
 durable-rules
+altair
+pandas
