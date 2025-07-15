@@ -90,13 +90,21 @@ def show_chart(filtered):
     st.altair_chart(chart, use_container_width=True)
 
 def show_table_and_download(filtered):
-    st.subheader("⚠️ Alert Audit Trail")
-    st.dataframe(filtered, height=400)
+    #"""Display alerts in an interactive DataFrame, ensuring 'detail' is string, and provide CSV download.
+    # Convert to DataFrame and ensure 'detail' is string
+    df = pd.DataFrame(filtered)
+    if 'detail' in df.columns:
+        df['detail'] = df['detail'].astype(str)
 
+    st.subheader("⚠️ Alert Audit Trail")
+    st.dataframe(df, height=400)
+
+    # CSV download
     buf = io.StringIO()
-    writer = csv.DictWriter(buf, fieldnames=filtered[0].keys())
+    writer = csv.DictWriter(buf, fieldnames=df.columns)
     writer.writeheader()
-    writer.writerows(filtered)
+    writer.writerows(df.to_dict(orient='records'))
+
     st.download_button(
         label="Download Alerts as CSV",
         data=buf.getvalue(),
