@@ -1,4 +1,4 @@
-# config.py
+# config.py - constants and defaults in one place
 from datetime import date
 
 # Threshold defaults
@@ -21,3 +21,8 @@ UNSTRUCTURED_PATTERN = (
     r"(Date|Timestamp)[:=]\s*(?P<timestamp>[\d\-T\:]+).*?"
     r"Amount[:=]\s*\$?(?P<amount>[\d,\.]+)"
 )
+
+
+# PEP & OFAC sources (can be local path or HTTP URL)
+PEP_LIST_SOURCE   = "data/pep_list.csv"
+OFAC_LIST_SOURCE  = "data/ofac_list.csv"
