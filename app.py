@@ -8,7 +8,6 @@ from datetime import datetime, date
 from collections import Counter
 import csv, io
 import re
-import textract
 from PIL import Image
 import pytesseract
 
@@ -16,29 +15,36 @@ from rules import run_compliance_batch, RULE_META
 
 # --- Page Config & Header ---
 st.set_page_config(
-    page_title="DharmaAI Compliance",
+    page_title="DharmaAI Banking Compliance",
     page_icon="🏦",
     layout="wide",
     initial_sidebar_state="expanded"
 )
-st.markdown("## 🏦 DharmaAI Compliance Demo", unsafe_allow_html=True)
+st.markdown("## 🏦 DharmaAI Banking Compliance Demo", unsafe_allow_html=True)
 st.write("---")
 
 fake = Faker()
 
-# --- Unstructured Data Parser ---
+# --- Unstructured Data Parser (no textract) ---
 def parse_unstructured(uploaded_file):
-    """Extract transaction records from arbitrary text/PDF/image uploads."""
-    # 1) Extract raw text
+    """Extract transaction records from .txt or image uploads."""
     name = uploaded_file.name.lower()
+    # Image → OCR
     if name.endswith(('.png', '.jpg', '.jpeg')):
         img = Image.open(uploaded_file)
         text = pytesseract.image_to_string(img)
+    # Plain text
+    elif name.endswith('.txt'):
+        raw = uploaded_file.read()
+        try:
+            text = raw.decode('utf-8', errors='ignore')
+        except:
+            text = str(raw)
     else:
-        raw = textract.process(uploaded_file)
-        text = raw.decode('utf-8', errors='ignore')
+        st.error(f"Unsupported unstructured format: {uploaded_file.name}")
+        return []
 
-    # 2) Regex to pull out TXID, timestamp, amount
+    # Regex to pull out TXID, timestamp, amount
     pattern = re.compile(
         r"TXID[:=]\s*(?P<tx_id>\w+).*?"
         r"(Date|Timestamp)[:=]\s*(?P<timestamp>[\d\-T\:]+).*?"
@@ -52,16 +58,16 @@ def parse_unstructured(uploaded_file):
         except:
             amt = 0.0
         txs.append({
-            "tx_id":     m.group('tx_id'),
-            "timestamp": m.group('timestamp'),
-            "amount":    amt,
-            # supply defaults for missing structured fields:
+            "tx_id":           m.group('tx_id'),
+            "timestamp":       m.group('timestamp'),
+            "amount":          amt,
+            # Defaults for missing structured fields
             "currency":        "USD",
             "customer_id":     None,
             "risk_rating":     "Unknown",
             "kyc_completed":   False,
             "sender_country":  None,
-            "receiver_country": None,
+            "receiver_country":None,
         })
     return txs
 
@@ -71,8 +77,8 @@ st.sidebar.title("⚙️ Settings")
 st.sidebar.markdown("### Data Source")
 uploaded_file = st.sidebar.file_uploader(
     "Upload transactions file",
-    type=['csv','json','xlsx','txt','pdf','docx','png','jpg'],
-    help="Structured or free-form; we’ll auto-parse."
+    type=['csv','json','xlsx','txt','png','jpg','jpeg'],
+    help="Structured CSV/JSON/XLSX or .txt/image for free-form parsing"
 )
 
 st.sidebar.markdown("---")
@@ -125,7 +131,7 @@ def gen_transaction():
 
 # --- Main App Logic ---
 if st.button("Run Compliance Checks"):
-    # 1) Load transactions
+    # 1) Load or mock transactions
     if uploaded_file:
         ext = uploaded_file.name.lower().split('.')[-1]
         if ext in ['csv', 'json', 'xlsx']:
@@ -180,7 +186,7 @@ if st.button("Run Compliance Checks"):
             "date":        rec_date
         })
 
-    # 4) Filter
+    # 4) Apply filters
     filtered = [
         r for r in records
         if r["rule"] in selected_rules
@@ -188,11 +194,10 @@ if st.button("Run Compliance Checks"):
         and r["date"] and r["date"] >= date_filter
     ]
 
-    # 5) Metrics
+    # 5) Metrics Display
     tx_count    = len(txs)
     alert_count = len(filtered)
     unique_rules= len({r["rule"] for r in filtered})
-
     col1, col2, col3 = st.columns(3)
     col1.metric("Transactions", tx_count)
     col2.metric("Alerts", alert_count)
@@ -209,7 +214,7 @@ if st.button("Run Compliance Checks"):
     ).properties(width='container', height=300)
     st.altair_chart(bar, use_container_width=True)
 
-    # 7) Active settings expander
+    # 7) Expander for active settings
     with st.expander("🔧 Active Filters & Parameters", expanded=False):
         st.write("**Rules:**", selected_rules)
         st.write("**Regulations:**", selected_regs)
@@ -222,7 +227,6 @@ if st.button("Run Compliance Checks"):
     # 8) Table & download
     st.subheader("⚠️ Alert Audit Trail")
     st.dataframe(filtered, height=400)
-
     buf = io.StringIO()
     writer = csv.DictWriter(buf, fieldnames=[
         "rule","regulation","description","entity","detail","timestamp","date"
