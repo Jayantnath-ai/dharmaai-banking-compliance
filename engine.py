@@ -16,10 +16,7 @@ def run_compliance(
     min_retention_years=MIN_RETENTION_YEARS_DEFAULT,
     enable_pep=True,
     enable_ofac=True
-):
-    """
-    Wrapper around rules.run_compliance_batch that exposes toggles for PEP and OFAC screening.
-    """
+)
     return run_compliance_batch(
         txs,
         ctr_threshold=ctr_threshold,
