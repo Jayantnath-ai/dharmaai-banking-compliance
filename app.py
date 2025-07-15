@@ -8,8 +8,6 @@ from datetime import datetime, date
 from collections import Counter
 import csv, io
 import re
-from PIL import Image
-import pytesseract
 
 from rules import run_compliance_batch, RULE_META
 
@@ -25,23 +23,18 @@ st.write("---")
 
 fake = Faker()
 
-# --- Unstructured Data Parser (no textract) ---
+# --- Unstructured Data Parser (TXT only) ---
 def parse_unstructured(uploaded_file):
-    """Extract transaction records from .txt or image uploads."""
+    """Extract transaction records from plain-text (.txt) uploads."""
     name = uploaded_file.name.lower()
-    # Image → OCR
-    if name.endswith(('.png', '.jpg', '.jpeg')):
-        img = Image.open(uploaded_file)
-        text = pytesseract.image_to_string(img)
-    # Plain text
-    elif name.endswith('.txt'):
+    if name.endswith('.txt'):
         raw = uploaded_file.read()
         try:
             text = raw.decode('utf-8', errors='ignore')
         except:
             text = str(raw)
     else:
-        st.error(f"Unsupported unstructured format: {uploaded_file.name}")
+        st.error(f"Unsupported unstructured format: {uploaded_file.name}. Only .txt is supported.")
         return []
 
     # Regex to pull out TXID, timestamp, amount
@@ -67,7 +60,7 @@ def parse_unstructured(uploaded_file):
             "risk_rating":     "Unknown",
             "kyc_completed":   False,
             "sender_country":  None,
-            "receiver_country":None,
+            "receiver_country": None,
         })
     return txs
 
@@ -77,8 +70,8 @@ st.sidebar.title("⚙️ Settings")
 st.sidebar.markdown("### Data Source")
 uploaded_file = st.sidebar.file_uploader(
     "Upload transactions file",
-    type=['csv','json','xlsx','txt','png','jpg','jpeg'],
-    help="Structured CSV/JSON/XLSX or .txt/image for free-form parsing"
+    type=['csv', 'json', 'xlsx', 'txt'],
+    help="Structured CSV/JSON/XLSX or plain-text (.txt) files"
 )
 
 st.sidebar.markdown("---")
