@@ -16,7 +16,7 @@ def run_compliance(
     min_retention_years=MIN_RETENTION_YEARS_DEFAULT,
     enable_pep=True,
     enable_ofac=True
-)
+):
     return run_compliance_batch(
         txs,
         ctr_threshold=ctr_threshold,
