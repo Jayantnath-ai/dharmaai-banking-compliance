@@ -23,9 +23,11 @@ UNSTRUCTURED_PATTERN = (
     r"Amount[:=]\s*\$?(?P<amount>[\d,\.]+)"
 )
 
-# Dynamic PEP & OFAC list sources (authoritative CSV endpoints)
-PEP_LIST_SOURCE  = "https://api.opensanctions.org/entities.csv?schema=Person&tag=peps"
-OFAC_LIST_SOURCE = "https://www.treasury.gov/ofac/downloads/sdn.csv"
+
+# PEP list: query OpenSanctions JSON API for Politically Exposed Persons
+PEP_LIST_SOURCE  = "https://api.opensanctions.org/entities.json?schema=Person&tag=peps&limit=10000"  # :contentReference[oaicite:0]{index=0}
+# OFAC SDN list (CSV) from U.S. Treasury
+OFAC_LIST_SOURCE = "https://home.treasury.gov/ofac/downloads/sdn.csv"                              # :contentReference[oaicite:1]{index=1}
 
 # Cache TTL for remote list downloads (seconds) – 24 hours
 LIST_CACHE_TTL    = 86400
