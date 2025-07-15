@@ -50,10 +50,9 @@ def parse_unstructured(uploaded_file):
 
 @st.cache_data(ttl=LIST_CACHE_TTL)
 def load_pep_list(source=PEP_LIST_SOURCE):
-    """
-    Fetch or read PEP list, returning a set of customer_id strings.
-    Cached for LIST_CACHE_TTL seconds.
-    """
+    # Fetch or read PEP list, returning a set of customer_id strings.
+    # Cached for LIST_CACHE_TTL seconds.
+ 
     if source.lower().startswith("http"):
         resp = requests.get(source)
         resp.raise_for_status()
@@ -64,10 +63,7 @@ def load_pep_list(source=PEP_LIST_SOURCE):
 
 @st.cache_data(ttl=LIST_CACHE_TTL)
 def load_ofac_list(source=OFAC_LIST_SOURCE):
-    """
-    Fetch or read OFAC list, returning a set of account/entity identifiers.
-    Cached for LIST_CACHE_TTL seconds.
-    """
+    #"""Fetch or read OFAC list, returning a set of account/entity identifiers.Cached for LIST_CACHE_TTL seconds."""
     if source.lower().startswith("http"):
         resp = requests.get(source)
         resp.raise_for_status()
