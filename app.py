@@ -77,7 +77,7 @@ def main():
             sar_threshold=sar_threshold,
             min_retention_years=min_retention_years,
             enable_pep=enable_pep,
-            enable_ofac=enable_ofac
+            enable_ofac=enable_ofac,
 	    ownership_file=ownership_file,
 	    require_sof=require_sof,
 	    sof_threshold=sof_threshold
