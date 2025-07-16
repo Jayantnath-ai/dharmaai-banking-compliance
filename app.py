@@ -38,7 +38,10 @@ def main():
         sar_threshold,
         min_retention_years,
         enable_pep,
-        enable_ofac
+        enable_ofac,
+	ownership_file,
+	require_sof,
+    	sof_threshold
     ) = sidebar_settings(
         RULE_META,
         STRUCTURED_EXT,
@@ -75,6 +78,10 @@ def main():
             min_retention_years=min_retention_years,
             enable_pep=enable_pep,
             enable_ofac=enable_ofac
+	    ownership_file=ownership_file,
+	    require_sof=require_sof,
+	    sof_threshold=sof_threshold
+    
         )
 
         # 3) Build audit-trail records
