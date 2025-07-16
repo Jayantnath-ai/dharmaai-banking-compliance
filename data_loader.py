@@ -4,6 +4,7 @@ import pandas as pd
 import requests
 import io
 import re
+import csv
 import streamlit as st
 
 from config import (
@@ -14,6 +15,7 @@ from config import (
     OFAC_LIST_URL,
     PEP_LIST_LOCAL,
     OFAC_LIST_LOCAL,
+    OWNERSHIP_GRAPH_LOCAL,
     LIST_CACHE_TTL
 )
 
@@ -39,44 +41,36 @@ def parse_unstructured(uploaded_file):
     txs = []
     for m in pattern.finditer(text):
         try:
-            amt = float(m.group('amount').replace(',', ''))
+            amount = float(m.group('amount').replace(',', ''))
         except:
-            amt = 0.0
+            amount = 0.0
         txs.append({
-            "tx_id":     m.group('tx_id'),
+            "tx_id": m.group('tx_id'),
             "timestamp": m.group('timestamp'),
-            "amount":    amt
+            "amount": amount
         })
     return txs
 
 @st.cache_data(ttl=LIST_CACHE_TTL)
 def load_pep_list():
-    """
-    Attempt to download the bulk PEP CSV from OpenSanctions; if that fails,
-    fall back to the local data/pep_list.csv.
-    """
     try:
         resp = requests.get(PEP_LIST_URL, timeout=10)
         resp.raise_for_status()
         df = pd.read_csv(io.StringIO(resp.text))
-        # 'targets.simple.csv' uses columns like 'id' and 'name'
         if 'id' in df.columns:
             return set(df['id'].astype(str).dropna())
-        elif 'customer_id' in df.columns:
+        if 'customer_id' in df.columns:
             return set(df['customer_id'].astype(str).dropna())
     except Exception:
         try:
             df = pd.read_csv(PEP_LIST_LOCAL)
             return set(df['customer_id'].astype(str).dropna())
-        except Exception as e:
-            st.warning(f"Could not load PEP list (download or local): {e}")
+        except Exception:
+            st.warning("Could not load PEP list.")
             return set()
 
 @st.cache_data(ttl=LIST_CACHE_TTL)
 def load_ofac_list():
-    """
-    Download the OFAC SDN CSV; if that fails, fall back to data/ofac_list.csv.
-    """
     try:
         resp = requests.get(OFAC_LIST_URL, timeout=10)
         resp.raise_for_status()
@@ -84,13 +78,25 @@ def load_ofac_list():
     except Exception:
         try:
             df = pd.read_csv(OFAC_LIST_LOCAL)
-        except Exception as e:
-            st.warning(f"Could not load OFAC list (download or local): {e}")
+        except Exception:
+            st.warning("Could not load OFAC list.")
             return set()
-
     ids = set()
     if 'account' in df.columns:
         ids |= set(df['account'].astype(str).dropna())
     if 'entity_name' in df.columns:
         ids |= set(df['entity_name'].astype(str).dropna())
     return ids
+
+@st.cache_data
+def load_ownership_graph(path=OWNERSHIP_GRAPH_LOCAL):
+    graph = {}
+    try:
+        with open(path, newline='') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                parent, child = row['parent_id'], row['child_id']
+                graph.setdefault(parent, []).append(child)
+    except FileNotFoundError:
+        return {}
+    return graph

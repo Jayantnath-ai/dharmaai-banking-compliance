@@ -9,12 +9,12 @@ from datetime import datetime
 
 def configure_page():
     st.set_page_config(
-        page_title="DharmaAI Banking Compliance",
+        page_title="DharmaAI Compliance",
         page_icon="🏦",
         layout="wide",
         initial_sidebar_state="expanded"
     )
-    st.markdown("## 🏦 DharmaAI Banking Compliance Demo", unsafe_allow_html=True)
+    st.markdown("## 🏦 DharmaAI Compliance Demo", unsafe_allow_html=True)
     st.write("---")
 
 def sidebar_settings(
@@ -56,6 +56,23 @@ def sidebar_settings(
     enable_pep  = st.sidebar.checkbox("Enable PEP Screening", value=True)
     enable_ofac = st.sidebar.checkbox("Enable OFAC Screening", value=True)
 
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### EDD Settings")
+    ownership_file = st.sidebar.file_uploader(
+        "Upload ownership graph (CSV)",
+        type=['csv'],
+        help="Columns: parent_id, child_id"
+    )
+    require_sof = st.sidebar.checkbox(
+        "Require source-of-funds for large CASH txns",
+        value=True
+    )
+    sof_threshold = st.sidebar.number_input(
+        "SOF Amount Threshold ($)",
+        min_value=0,
+        value=10000
+    )
+
     return (
         uploaded_file,
         selected_rules,
@@ -66,7 +83,10 @@ def sidebar_settings(
         sar_threshold,
         min_retention_years,
         enable_pep,
-        enable_ofac
+        enable_ofac,
+        ownership_file,
+        require_sof,
+        sof_threshold
     )
 
 def show_metrics(txs, filtered):
@@ -90,21 +110,16 @@ def show_chart(filtered):
     st.altair_chart(chart, use_container_width=True)
 
 def show_table_and_download(filtered):
-    #"""Display alerts in an interactive DataFrame, ensuring 'detail' is string, and provide CSV download.
-    # Convert to DataFrame and ensure 'detail' is string
     df = pd.DataFrame(filtered)
     if 'detail' in df.columns:
         df['detail'] = df['detail'].astype(str)
-
     st.subheader("⚠️ Alert Audit Trail")
     st.dataframe(df, height=400)
 
-    # CSV download
     buf = io.StringIO()
     writer = csv.DictWriter(buf, fieldnames=df.columns)
     writer.writeheader()
     writer.writerows(df.to_dict(orient='records'))
-
     st.download_button(
         label="Download Alerts as CSV",
         data=buf.getvalue(),
