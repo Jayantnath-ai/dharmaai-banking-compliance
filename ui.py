@@ -1,5 +1,3 @@
-# ui.py
-
 import streamlit as st
 import altair as alt
 import pandas as pd
@@ -25,7 +23,10 @@ def sidebar_settings(
     ctr_default,
     exposure_default,
     sar_default,
-    retention_default
+    retention_default,
+    velocity_default,
+    velocity_window_default,
+    geojump_window_default
 ):
     st.sidebar.title("⚙️ Settings")
 
@@ -73,6 +74,18 @@ def sidebar_settings(
         value=10000
     )
 
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### Monitoring Settings")
+    velocity_threshold      = st.sidebar.number_input(
+        "Velocity txns threshold (M)", min_value=1, value=velocity_default
+    )
+    velocity_window_minutes = st.sidebar.number_input(
+        "Velocity window (minutes N)", min_value=1, value=velocity_window_default
+    )
+    geojump_window_minutes  = st.sidebar.number_input(
+        "Geo-jump time window (minutes T)", min_value=1, value=geojump_window_default
+    )
+
     return (
         uploaded_file,
         selected_rules,
@@ -86,7 +99,10 @@ def sidebar_settings(
         enable_ofac,
         ownership_file,
         require_sof,
-        sof_threshold
+        sof_threshold,
+        velocity_threshold,
+        velocity_window_minutes,
+        geojump_window_minutes
     )
 
 def show_metrics(txs, filtered):
@@ -113,6 +129,7 @@ def show_table_and_download(filtered):
     df = pd.DataFrame(filtered)
     if 'detail' in df.columns:
         df['detail'] = df['detail'].astype(str)
+
     st.subheader("⚠️ Alert Audit Trail")
     st.dataframe(df, height=400)
 
@@ -120,6 +137,7 @@ def show_table_and_download(filtered):
     writer = csv.DictWriter(buf, fieldnames=df.columns)
     writer.writeheader()
     writer.writerows(df.to_dict(orient='records'))
+
     st.download_button(
         label="Download Alerts as CSV",
         data=buf.getvalue(),

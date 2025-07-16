@@ -1,5 +1,3 @@
-# app.py
-
 import streamlit as st
 from datetime import datetime
 from config import (
@@ -9,7 +7,10 @@ from config import (
     CTR_THRESHOLD_DEFAULT,
     EXPOSURE_THRESHOLD_DEFAULT,
     SAR_TXN_COUNT_THRESHOLD_DEFAULT,
-    MIN_RETENTION_YEARS_DEFAULT
+    MIN_RETENTION_YEARS_DEFAULT,
+    VELOCITY_TXN_THRESHOLD_DEFAULT,
+    VELOCITY_WINDOW_MINUTES_DEFAULT,
+    GEOJUMP_WINDOW_MINUTES_DEFAULT
 )
 from data_loader import load_structured, parse_unstructured
 from generators import build_customer_map, gen_transaction
@@ -24,10 +25,8 @@ from ui import (
 from rules import RULE_META
 
 def main():
-    # Configure page layout and header
     configure_page()
 
-    # Render sidebar and retrieve user settings
     (
         uploaded_file,
         selected_rules,
@@ -39,9 +38,12 @@ def main():
         min_retention_years,
         enable_pep,
         enable_ofac,
-	ownership_file,
-	require_sof,
-    	sof_threshold
+        ownership_file,
+        require_sof,
+        sof_threshold,
+        velocity_threshold,
+        velocity_window_minutes,
+        geojump_window_minutes
     ) = sidebar_settings(
         RULE_META,
         STRUCTURED_EXT,
@@ -50,12 +52,13 @@ def main():
         CTR_THRESHOLD_DEFAULT,
         EXPOSURE_THRESHOLD_DEFAULT,
         SAR_TXN_COUNT_THRESHOLD_DEFAULT,
-        MIN_RETENTION_YEARS_DEFAULT
+        MIN_RETENTION_YEARS_DEFAULT,
+        VELOCITY_TXN_THRESHOLD_DEFAULT,
+        VELOCITY_WINDOW_MINUTES_DEFAULT,
+        GEOJUMP_WINDOW_MINUTES_DEFAULT
     )
 
-    # Button triggers compliance checks
     if st.button("Run Compliance Checks"):
-        # 1) Load or generate transactions
         if uploaded_file:
             ext = uploaded_file.name.lower().split('.')[-1]
             if ext in STRUCTURED_EXT:
@@ -69,22 +72,22 @@ def main():
             cust_map = build_customer_map()
             txs = [gen_transaction(cust_map) for _ in range(200)]
 
-        # 2) Run compliance engine
         raw_alerts = run_compliance(
             txs,
-            ctr_threshold=ctr_threshold,
-            exposure_threshold=exposure_threshold,
-            sar_threshold=sar_threshold,
-            min_retention_years=min_retention_years,
-            enable_pep=enable_pep,
-            enable_ofac=enable_ofac,
-	    ownership_file=ownership_file,
-	    require_sof=require_sof,
-	    sof_threshold=sof_threshold
-    
+            ctr_threshold,
+            exposure_threshold,
+            sar_threshold,
+            min_retention_years,
+            enable_pep,
+            enable_ofac,
+            ownership_file,
+            require_sof,
+            sof_threshold,
+            velocity_threshold,
+            velocity_window_minutes,
+            geojump_window_minutes
         )
 
-        # 3) Build audit-trail records
         tx_map = {tx.get("tx_id", idx): tx for idx, tx in enumerate(txs)}
         records = []
         for rule, entity, detail in raw_alerts:
@@ -107,7 +110,6 @@ def main():
                 "date":        rec_date
             })
 
-        # 4) Apply filters
         filtered = [
             r for r in records
             if r["rule"] in selected_rules
@@ -115,7 +117,6 @@ def main():
             and r["date"] and r["date"] >= date_filter
         ]
 
-        # 5) Display metrics, chart, and table
         show_metrics(txs, filtered)
         show_chart(filtered)
         show_table_and_download(filtered)

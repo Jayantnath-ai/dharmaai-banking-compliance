@@ -1,5 +1,3 @@
-# config.py
-
 from datetime import date
 
 # Threshold defaults
@@ -7,6 +5,11 @@ CTR_THRESHOLD_DEFAULT            = 10_000
 EXPOSURE_THRESHOLD_DEFAULT       = 100_000
 SAR_TXN_COUNT_THRESHOLD_DEFAULT  = 5
 MIN_RETENTION_YEARS_DEFAULT      = 5
+
+# Monitoring defaults
+VELOCITY_TXN_THRESHOLD_DEFAULT   = 10   # M transactions
+VELOCITY_WINDOW_MINUTES_DEFAULT  = 60   # N minutes
+GEOJUMP_WINDOW_MINUTES_DEFAULT   = 120  # T minutes
 
 # Supported file extensions
 STRUCTURED_EXT    = {'csv', 'json', 'xlsx'}
@@ -24,17 +27,17 @@ UNSTRUCTURED_PATTERN = (
 )
 
 # Bulk download URLs (CSV)
-PEP_LIST_URL    = "https://www.opensanctions.org/datasets/peps/targets.simple.csv"
-OFAC_LIST_URL   = "https://www.treasury.gov/ofac/downloads/sdn.csv"
+PEP_LIST_URL            = "https://www.opensanctions.org/datasets/peps/targets.simple.csv"
+OFAC_LIST_URL           = "https://www.treasury.gov/ofac/downloads/sdn.csv"
 
 # Local fallbacks
-PEP_LIST_LOCAL  = "data/pep_list.csv"
-OFAC_LIST_LOCAL = "data/ofac_list.csv"
-OWNERSHIP_GRAPH_LOCAL = "data/ownership_graph.csv"
+PEP_LIST_LOCAL          = "data/pep_list.csv"
+OFAC_LIST_LOCAL         = "data/ofac_list.csv"
+OWNERSHIP_GRAPH_LOCAL   = "data/ownership_graph.csv"
 
 # Cache TTL for list downloads (seconds)
-LIST_CACHE_TTL = 24 * 60 * 60
+LIST_CACHE_TTL          = 24 * 60 * 60
 
 # EDD defaults
-REQUIRE_SOF_FOR_CASH = True
-SOF_AMOUNT_THRESHOLD = 10000
+REQUIRE_SOF_FOR_CASH    = True
+SOF_AMOUNT_THRESHOLD    = 10000

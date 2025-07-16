@@ -1,5 +1,3 @@
-# data_loader.py
-
 import pandas as pd
 import requests
 import io
@@ -45,9 +43,9 @@ def parse_unstructured(uploaded_file):
         except:
             amount = 0.0
         txs.append({
-            "tx_id": m.group('tx_id'),
+            "tx_id":     m.group('tx_id'),
             "timestamp": m.group('timestamp'),
-            "amount": amount
+            "amount":    amount
         })
     return txs
 
