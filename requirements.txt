@@ -3,3 +3,4 @@ faker
 durable-rules
 altair
 pandas
+networkx
