@@ -1,18 +1,21 @@
+# ui.py
+
 import streamlit as st
 import altair as alt
 import pandas as pd
 import csv, io
 from collections import Counter
 from datetime import datetime
+import networkx as nx
 
 def configure_page():
     st.set_page_config(
-        page_title="DharmaAI Compliance",
+        page_title="DharmaAI Banking Compliance",
         page_icon="🏦",
         layout="wide",
         initial_sidebar_state="expanded"
     )
-    st.markdown("## 🏦 DharmaAI Compliance Demo", unsafe_allow_html=True)
+    st.markdown("## 🏦 DharmaAI Banking Compliance Demo", unsafe_allow_html=True)
     st.write("---")
 
 def sidebar_settings(
@@ -73,6 +76,32 @@ def sidebar_settings(
         min_value=0,
         value=10000
     )
+
+    # EDD validation
+    if ownership_file:
+        try:
+            df_graph = pd.read_csv(ownership_file)
+            expected = {"parent_id", "child_id"}
+            actual = set(df_graph.columns)
+            if not expected.issubset(actual):
+                missing = expected - actual
+                st.sidebar.error(f"Ownership graph missing columns: {', '.join(missing)}")
+            else:
+                G = nx.DiGraph()
+                G.add_edges_from(df_graph[['parent_id', 'child_id']].values)
+                cycle = next(nx.simple_cycles(G), None)
+                if cycle:
+                    st.sidebar.error(f"Ownership graph contains a cycle: {cycle}")
+                else:
+                    st.sidebar.success("Ownership graph looks good ✅")
+        except Exception as e:
+            st.sidebar.error(f"Error reading ownership graph: {e}")
+
+    if require_sof:
+        if sof_threshold <= 0:
+            st.sidebar.error("❌ SOF threshold must be greater than zero")
+        else:
+            st.sidebar.info(f"Will require SOF for cash > ${sof_threshold}")
 
     st.sidebar.markdown("---")
     st.sidebar.markdown("### Monitoring Settings")
@@ -144,3 +173,4 @@ def show_table_and_download(filtered):
         file_name="compliance_alerts.csv",
         mime="text/csv"
     )
+
