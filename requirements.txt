@@ -4,3 +4,6 @@ durable-rules
 altair
 pandas
 networkx
+generators
+Faker
+requests
